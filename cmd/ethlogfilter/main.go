@@ -25,6 +25,7 @@ type config struct {
 	TxHashes  []string `yaml:"tx_hashes" arg:"-x,--tx-hashes" placeholder:"HASH [HASH..]" help:"Transaction hashes"`
 	FromBlock uint64   `yaml:"from_block" arg:"-f,--from-block" placeholder:"FROM_BLOCK" help:"Filter from block"`
 	ToBlock   uint64   `yaml:"to_block" arg:"-t,--to-block" placeholder:"TO_BLOCK" help:"Filter to block"`
+	LogBlock  uint64   `yaml:"block" arg:"-b,--block" placeholder:"LOG_BLOCK" help:"Filter logs from this block (overwrites FROM_BLOCK and TO_BLOCK)"`
 }
 
 func main() {
@@ -69,14 +70,18 @@ func main() {
 		fmt.Println("Filter txHashes", conf.TxHashes)
 	}
 
+	// If |conf.LogBlock| is given, then fromBlock and toBlock is both |conf.LogBlock|,
+	// otherwise `conf.FromBlock| and |conf.ToBlock| are used.
+	fromBlock, toBlock := chooseBlock(conf.FromBlock, conf.ToBlock, conf.LogBlock)
+
 	logs, err := client.FilterLogs(context.Background(), ethereum.FilterQuery{
-		FromBlock: blockNumber(conf.FromBlock),
-		ToBlock:   blockNumber(conf.ToBlock),
+		FromBlock: blockNumber(fromBlock),
+		ToBlock:   blockNumber(toBlock),
 		Addresses: addresses,
 		Topics:    [][]common.Hash{topics},
 	})
 
-	// Collect logs ([]types.Log) into []*types.Log,
+	// Collect |logs| ([]types.Log) into a []*types.Log,
 	// and filtering for TxHash if we got one from the user.
 	var targetLogs []*types.Log
 	if len(conf.TxHashes) > 0 {
@@ -99,18 +104,26 @@ func main() {
 	fmt.Printf("%s\n", logsJson)
 }
 
+// Use |logBlock| as fromBlock and toBlock if not 0
+func chooseBlock(fromBlock, toBlock, logBlock uint64) (uint64, uint64) {
+	if logBlock == 0 {
+		return fromBlock, toBlock
+	}
+	return logBlock, logBlock
+}
+
+// Return nil if |b| == 0 to get desired behavior from ethclient.Client.FilterQuery
 func blockNumber(b uint64) *big.Int {
 	if b == 0 {
-		// Return nil to get desired behavior from ethclient.Client.FilterQuery
 		return nil
 	}
 
 	return big.NewInt(int64(b))
 }
 
-// mergeConfig returns a merged config from a and b
-// mergeConfig only uses a field value from a ONLY if that field is null/zero-valued in b,
-// i.e. it uses b to overwrite a.
+// mergeConfig returns a merged config from |a| and |b|
+// mergeConfig only uses a field value from |a| ONLY if that field is null/zero-valued in |b|,
+// i.e. it uses b to overwrite |a|.
 func mergeConfig(a, b *config) *config {
 	if b == nil {
 		if a == nil {
