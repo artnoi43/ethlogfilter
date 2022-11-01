@@ -1,7 +1,9 @@
 # ethlogfilter
 
 ethlogfilter is a small, single-file script for printing Ethereum logs
-based on some criteria. The current version can filter logs using
+based on some criteria. The current version can filter logs using `go-ethereum`.
+
+It outputs the logs in JSON format, and is especially useful for Web3 devs.
 
 ## Command examples
 
