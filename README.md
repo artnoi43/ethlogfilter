@@ -5,6 +5,16 @@ based on some criteria. The current version can filter logs using `go-ethereum`.
 
 It outputs the logs in JSON format, and is especially useful for Web3 devs.
 
+## Configuration
+
+This script reads default configuration at location `$HOME/.config/ethlogfilter/config.yaml`,
+so you may need to initalize this directory first if you don't want to specify everything
+manually. We provide a shell script for this task:
+
+```bash
+./init-config.sh;
+```
+
 ## Command examples
 
 Let's say we want filter all logs from [this Mainnet transaction on block

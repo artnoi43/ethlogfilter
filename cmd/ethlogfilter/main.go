@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"os"
 
 	"github.com/alexflint/go-arg"
 	"github.com/artnoi43/gsl/gslutils"
@@ -33,9 +34,15 @@ func main() {
 	argConf := new(config)
 	arg.MustParse(argConf)
 
-	configFile := "./config.yaml"
+	var configFile string
 	if len(argConf.ConfigFile) > 0 {
 		configFile = argConf.ConfigFile
+	} else {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			panic("failed to get config location in user's homedir: " + err.Error())
+		}
+		configFile = home + "/.config/ethlogfilter/config.yaml"
 	}
 
 	// Read in config
