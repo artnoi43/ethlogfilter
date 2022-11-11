@@ -82,10 +82,10 @@ func main() {
 	fromBlock, toBlock := chooseBlock(conf.FromBlock, conf.ToBlock, conf.LogBlock)
 
 	logs, err := client.FilterLogs(context.Background(), ethereum.FilterQuery{
-		FromBlock: blockNumber(fromBlock),
-		ToBlock:   blockNumber(toBlock),
-		Addresses: addresses,
-		Topics:    [][]common.Hash{topics},
+		FromBlock: chooseBlockNumber(fromBlock),
+		ToBlock:   chooseBlockNumber(toBlock),
+		Addresses: chooseAddresses(addresses),
+		Topics:    chooseTopics(topics),
 	})
 
 	// Collect |logs| ([]types.Log) into a []*types.Log,
@@ -120,12 +120,28 @@ func chooseBlock(fromBlock, toBlock, logBlock uint64) (uint64, uint64) {
 }
 
 // Return nil if |b| == 0 to get desired behavior from ethclient.Client.FilterQuery
-func blockNumber(b uint64) *big.Int {
+func chooseBlockNumber(b uint64) *big.Int {
 	if b == 0 {
 		return nil
 	}
 
 	return big.NewInt(int64(b))
+}
+
+func chooseAddresses(addresses []common.Address) []common.Address {
+	if len(addresses) == 0 {
+		return nil
+	}
+
+	return addresses
+}
+
+func chooseTopics(topics []common.Hash) [][]common.Hash {
+	if len(topics) == 0 {
+		return nil
+	}
+
+	return [][]common.Hash{topics}
 }
 
 // mergeConfig returns a merged config from |a| and |b|
