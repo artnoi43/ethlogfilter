@@ -19,6 +19,7 @@ import (
 type config struct {
 	ConfigFile string `yaml:"-" arg:"-c,--config" placeholder:"FILE" help:"Config file to read"`
 	Verbose    bool   `yaml:"-" arg:"-v,--verbose" help:"Verbose output (CLI arg only, placing this in config file won't work)"`
+	OutputFile string `yaml:"-" arg:"-o,--outfile" help:"Write JSON output to this file"`
 
 	NodeURL   string   `yaml:"node_url" arg:"-n,--node-url" placeholder:"NODE_URL" help:"HTTP or WS URL of an Ethereum node"`
 	Addresses []string `yaml:"addresses" arg:"-a,--addresses" placeholder:"ADDR [ADDR..]" help:"Contract address"`
@@ -46,40 +47,40 @@ func main() {
 	}
 
 	// Read in config
-	conf, err := soyutils.ReadFileYAMLPointer[config](configFile)
+	fileConf, err := soyutils.ReadFileYAMLPointer[config](configFile)
 	if err != nil {
 		panic("read config failed: " + err.Error())
 	}
 
 	// Overwrite config from file with CLI args
-	conf = mergeConfig(conf, argConf)
+	fileConf = mergeConfig(fileConf, argConf)
 
-	client, err := ethclient.Dial(conf.NodeURL)
+	client, err := ethclient.Dial(fileConf.NodeURL)
 	if err != nil {
 		panic("new client failed: " + err.Error())
 	}
 
 	var addresses []common.Address
-	for _, addrString := range conf.Addresses {
+	for _, addrString := range fileConf.Addresses {
 		address := common.HexToAddress(addrString)
 		addresses = append(addresses, address)
 	}
 
 	var topics []common.Hash
-	for _, topicsStr := range conf.Topics {
+	for _, topicsStr := range fileConf.Topics {
 		topic := common.HexToHash(topicsStr)
 		topics = append(topics, topic)
 	}
 
-	if conf.Verbose {
+	if fileConf.Verbose {
 		fmt.Println("Filter addresses", addresses)
 		fmt.Println("Filter topics", topics)
-		fmt.Println("Filter txHashes", conf.TxHashes)
+		fmt.Println("Filter txHashes", fileConf.TxHashes)
 	}
 
 	// If |conf.LogBlock| is given, then fromBlock and toBlock is both |conf.LogBlock|,
 	// otherwise `conf.FromBlock| and |conf.ToBlock| are used.
-	fromBlock, toBlock := chooseBlock(conf.FromBlock, conf.ToBlock, conf.LogBlock)
+	fromBlock, toBlock := chooseBlock(fileConf.FromBlock, fileConf.ToBlock, fileConf.LogBlock)
 
 	logs, err := client.FilterLogs(context.Background(), ethereum.FilterQuery{
 		FromBlock: chooseBlockNumber(fromBlock),
@@ -91,9 +92,9 @@ func main() {
 	// Collect |logs| ([]types.Log) into a []*types.Log,
 	// and filtering for TxHash if we got one from the user.
 	var targetLogs []*types.Log
-	if len(conf.TxHashes) > 0 {
+	if len(fileConf.TxHashes) > 0 {
 		targetLogs = gslutils.CollectPointersIf(&logs, func(log types.Log) bool {
-			return gslutils.Contains(conf.TxHashes, log.TxHash.String())
+			return gslutils.Contains(fileConf.TxHashes, log.TxHash.String())
 		})
 	} else {
 		targetLogs = gslutils.CollectPointers(&logs)
@@ -106,6 +107,13 @@ func main() {
 	logsJson, err := json.Marshal(targetLogs)
 	if err != nil {
 		panic("failed to marshal event logs to json: " + err.Error())
+	}
+
+	if len(fileConf.OutputFile) != 0 {
+		if err := os.WriteFile(fileConf.OutputFile, logsJson, os.ModePerm); err != nil {
+			fmt.Println("failed to write JSON output to file", fileConf.OutputFile)
+			fmt.Println(err.Error())
+		}
 	}
 
 	fmt.Printf("%s\n", logsJson)
@@ -196,6 +204,12 @@ func mergeConfig(a, b *config) *config {
 		out.ToBlock = b.ToBlock
 	} else {
 		out.ToBlock = a.ToBlock
+	}
+
+	if b.OutputFile != "" {
+		out.OutputFile = b.OutputFile
+	} else {
+		out.OutputFile = b.OutputFile
 	}
 
 	return out
